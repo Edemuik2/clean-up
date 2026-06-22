@@ -1,0 +1,19 @@
+name: CleanUpApp
+options:
+  bundleIdPrefix: com.yourdomain
+targets:
+  CleanUpApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources: [CleanUpApp]
+    info:
+      path: CleanUpApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSPhotoLibraryUsageDescription: "Необходим доступ для выбора фото."
+        NSPhotoLibraryAddUsageDescription: "Необходим доступ для сохранения обработанных фото."
+    settings:
+      base:
+        DEVELOPMENT_TEAM: "" # Оставь пустым, Codemagic подставит сам
+        ENABLE_USER_SCRIPT_SANDBOXING: NO

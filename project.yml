@@ -17,3 +17,5 @@ targets:
       base:
         DEVELOPMENT_TEAM: "" # Оставь пустым, Codemagic подставит сам
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos

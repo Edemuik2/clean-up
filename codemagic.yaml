@@ -5,9 +5,6 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       xcode: latest
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.yourdomain.CleanUpApp
     scripts:
       - name: Install XcodeGen
         script: brew install xcodegen
@@ -25,8 +22,7 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             archive
             
-          # Упаковка в IPA без подписи (для установки через TrollStore/AltStore)
-          # Если есть аккаунт разработчика, Codemagic подпишет автоматически благодаря блоку ios_signing
+          # Упаковка в IPA без подписи (для установки через TrollStore/AltStore/Sideloadly)
           mkdir -p $PWD/build/Payload
           cp -r $PWD/build/CleanUpApp.xcarchive/Products/Applications/CleanUpApp.app $PWD/build/Payload/
           cd $PWD/build

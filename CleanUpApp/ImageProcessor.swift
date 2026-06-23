@@ -1,8 +1,9 @@
 import UIKit
 import CoreImage
 import Accelerate
+import SwiftUI
 
-class ImageProcessor {
+final class ImageProcessor: @unchecked Sendable {
     private let context = CIContext(options: [.useSoftwareRenderer: false])
     
     func createPixelBuffer(from image: UIImage) -> CVPixelBuffer? {

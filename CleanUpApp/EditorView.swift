@@ -10,6 +10,10 @@ struct EditorView: View {
     @State private var maskOpacity: Double = 1.0
     @State private var segmentedMask: UIImage? = nil
     
+    // Для анимации переливания (как в Apple Clean Up)
+    @State private var glowPhase: CGFloat = 0.0
+    @State private var pulse: Bool = false
+    
     private let coreMLManager = CoreMLManager()
     private let imageProcessor = ImageProcessor()
     
@@ -22,42 +26,59 @@ struct EditorView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                     
-                    // Слой с маской сегментации
+                    // Слой с маской сегментации (Пульсирующий градиент)
                     if let mask = segmentedMask {
-                        Image(uiImage: mask)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .opacity(maskOpacity)
-                            .blendMode(.screen)
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.pink, .purple, .cyan, .pink],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .mask(
+                                Image(uiImage: mask)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                            )
+                            .opacity(maskOpacity * (pulse ? 0.8 : 0.4))
+                            .shadow(color: .purple.opacity(0.5), radius: 10)
+                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: pulse)
+                            .onAppear { pulse = true }
                     }
                     
-                    // Слой рисования (Неоновый эффект)
-                    Canvas { context, size in
-                        let imageRect = calculateImageRect(in: size, imageSize: image.size)
-                        
-                        // Смещение и масштабирование пути под отображаемую картинку
-                        var transform = CGAffineTransform(translationX: imageRect.minX, y: imageRect.minY)
-                        let scale = imageRect.width / image.size.width
-                        transform = transform.scaledBy(x: scale, y: scale)
-                        
-                        let scaledPath = currentPath.applying(transform)
-                        
-                        // Неоновое свечение
-                        context.stroke(
-                            scaledPath,
-                            with: .linearGradient(
-                                Gradient(colors: [.pink, .purple, .cyan]),
-                                startPoint: .zero,
-                                endPoint: CGPoint(x: size.width, y: size.height)
-                            ),
-                            lineWidth: 30
-                        )
-                        
-                        // Белое ядро
-                        context.stroke(scaledPath, with: .color(.white), lineWidth: 10)
+                    // Слой рисования (Анимированный неоновый эффект)
+                    TimelineView(.animation) { timeline in
+                        Canvas { context, size in
+                            let imageRect = calculateImageRect(in: size, imageSize: image.size)
+                            
+                            var transform = CGAffineTransform(translationX: imageRect.minX, y: imageRect.minY)
+                            let scale = imageRect.width / image.size.width
+                            transform = transform.scaledBy(x: scale, y: scale)
+                            
+                            let scaledPath = currentPath.applying(transform)
+                            
+                            // Анимация смещения градиента
+                            let offset = glowPhase * size.width
+                            let start = CGPoint(x: -size.width + offset, y: -size.height + offset)
+                            let end = CGPoint(x: size.width + offset, y: size.height + offset)
+                            
+                            let gradient = Gradient(colors: [.pink, .purple, .cyan, .white, .pink])
+                            
+                            // Широкое размытое свечение (Outer Glow)
+                            context.stroke(
+                                scaledPath,
+                                with: .linearGradient(gradient, startPoint: start, endPoint: end),
+                                lineWidth: 35
+                            )
+                            
+                            // Белое плотное ядро (Inner Core)
+                            context.stroke(scaledPath, with: .color(.white), lineWidth: 12)
+                        }
+                        .blur(radius: 3)
+                        .blendMode(.screen)
                     }
-                    .blur(radius: 2)
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
@@ -65,7 +86,6 @@ struct EditorView: View {
                                 let imageRect = calculateImageRect(in: geometry.size, imageSize: image.size)
                                 guard imageRect.contains(value.location) else { return }
                                 
-                                // Перевод координат экрана в координаты оригинального изображения
                                 let localX = (value.location.x - imageRect.minX) * (image.size.width / imageRect.width)
                                 let localY = (value.location.y - imageRect.minY) * (image.size.height / imageRect.height)
                                 let point = CGPoint(x: localX, y: localY)
@@ -83,13 +103,20 @@ struct EditorView: View {
                     )
                     
                     if isProcessing {
-                        Color.black.opacity(0.4).ignoresSafeArea()
-                        ProgressView("Обработка ИИ...")
-                            .tint(.white)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.8))
-                            .cornerRadius(12)
+                        Color.black.opacity(0.3).ignoresSafeArea()
+                        VStack {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+                            Text("Обработка ИИ...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.top, 10)
+                        }
+                        .padding(30)
+                        .background(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                        .cornerRadius(20)
                     }
                 }
             }
@@ -104,12 +131,8 @@ struct EditorView: View {
                         .background(Color.gray.opacity(0.3))
                         .clipShape(Circle())
                 }
-                
                 Spacer()
-                
-                Button(action: {
-                    isEraserActive.toggle()
-                }) {
+                Button(action: { isEraserActive.toggle() }) {
                     Image(systemName: "eraser.fill")
                         .font(.title2)
                         .foregroundColor(isEraserActive ? .black : .white)
@@ -117,9 +140,7 @@ struct EditorView: View {
                         .background(isEraserActive ? Color.white : Color.gray.opacity(0.3))
                         .clipShape(Circle())
                 }
-                
                 Spacer()
-                
                 Button(action: runInpainting) {
                     Text("Стереть")
                         .fontWeight(.bold)
@@ -130,9 +151,7 @@ struct EditorView: View {
                         .cornerRadius(20)
                 }
                 .disabled(currentPath.isEmpty && segmentedMask == nil || isProcessing)
-                
                 Spacer()
-                
                 Button(action: saveImage) {
                     Image(systemName: "square.and.arrow.down")
                         .font(.title2)
@@ -148,13 +167,16 @@ struct EditorView: View {
         }
         .onAppear {
             coreMLManager.loadModels()
+            // Запуск бесконечной анимации градиента
+            withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                glowPhase = 1.0
+            }
         }
     }
     
     private func calculateImageRect(in viewSize: CGSize, imageSize: CGSize) -> CGRect {
         let viewRatio = viewSize.width / viewSize.height
         let imageRatio = imageSize.width / imageSize.height
-        
         var rect = CGRect.zero
         if imageRatio > viewRatio {
             rect.size.width = viewSize.width
@@ -182,16 +204,17 @@ struct EditorView: View {
                 await MainActor.run {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         self.segmentedMask = resultMask
-                        self.currentPath = Path() // Очищаем линию, оставляем маску
+                        self.currentPath = Path()
                     }
                     self.isProcessing = false
                 }
             } else {
-                // Фолбэк: если модель не сработала, используем нарисованный путь как маску
                 let fallbackMask = imageProcessor.createMaskImage(from: currentPath, size: image.size)
                 await MainActor.run {
-                    self.segmentedMask = fallbackMask
-                    self.currentPath = Path()
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        self.segmentedMask = fallbackMask
+                        self.currentPath = Path()
+                    }
                     self.isProcessing = false
                 }
             }
@@ -205,11 +228,10 @@ struct EditorView: View {
         Task {
             if let resultImage = await coreMLManager.inpaint(image: image, mask: mask) {
                 await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.5)) {
+                    withAnimation(.easeOut(duration: 0.4)) {
                         self.maskOpacity = 0
                     }
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                         self.image = resultImage
                         self.segmentedMask = nil
                         self.maskOpacity = 1.0

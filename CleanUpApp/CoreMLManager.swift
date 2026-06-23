@@ -2,7 +2,7 @@ import Foundation
 import CoreML
 import UIKit
 
-class CoreMLManager {
+final class CoreMLManager: @unchecked Sendable {
     private var segmentationModel: MLModel?
     private var inpaintingModel: MLModel?
     private let imageProcessor = ImageProcessor()
